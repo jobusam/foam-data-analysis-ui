@@ -19,7 +19,7 @@ import java.util.*
  * @author jobusam
  *
  * This implementation creates several charts (bar chart, line chart, pie chart) and uses
- * as data input the file size of all files from a given directory (define data directories in Data class!
+ * as data input the file size of all files from a given directory (define data directories in DataCollection class!
  *
  * The charts shall display the amount of files depending on the file size.
  *
@@ -38,7 +38,7 @@ fun main(args: Array<String>) {
     launch<MasterApp>(args)
 }
 
-class Data {
+class DataCollection {
     companion object {
         val images: List<Image>
 
@@ -60,7 +60,7 @@ class Data {
                         Image("Test Image ", getFileSize(Paths.get("/home/johannes/Desktop/installation")))
                 )
 
-        //val images = Data().deserializeFromJSONFile(Paths.get("/home/johannes/Desktop/test/test.json"))
+        //val images = DataCollection().deserializeFromJSONFile(Paths.get("/home/johannes/Desktop/test/test.json"))
         private fun serializeToJSON(output: Path) {
             val mapper = ObjectMapper().registerModule(KotlinModule())
             //pretty file output
@@ -75,8 +75,10 @@ class Data {
     }
 }
 
-data class Image(val imageName: String, val map: Map<Int, Int>) {
-    val amountOfFiles = map.values.sum()
+data class CatStat(val amount:Int,val size:Long)
+
+data class Image(val imageName: String, val data: Map<Int, Int>) {
+    val amountOfFiles = data.values.sum()
 }
 
 class MasterApp : App(MasterView::class)
@@ -85,42 +87,42 @@ class MasterView : View() {
 
     private val lineChart = linechart("Häufigkeit nach Dateigröße",
             createCategoryAxis(), createNumberAxis()) {
-        Data.images.forEach { image ->
+        DataCollection.images.forEach { image ->
             series(image.imageName) {
-                image.map.forEach { data(convertToCategory(it.key), it.value) }
+                image.data.forEach { data(convertToCategory(it.key), it.value) }
             }
         }
     }
 
     private val cumulatedLineChart = linechart("Kumulierte Häufigkeit nach Dateigröße",
             createCategoryAxis(), createNumberAxis()) {
-        Data.images.forEach { image ->
+        DataCollection.images.forEach { image ->
             series(image.imageName) {
-                cumulateMapContent(image.map).forEach { data(convertToCategory(it.key), it.value) }
+                cumulateMapContent(image.data).forEach { data(convertToCategory(it.key), it.value) }
             }
         }
     }
 
     private val relativeCumulatedLineChart = linechart("Relativierte kumulierte Häufigkeit nach Dateigröße",
             createCategoryAxis(), createNumberAxis("Anzahl der Dateien / Gesamtanzahl in %")) {
-        Data.images.forEach { image ->
+        DataCollection.images.forEach { image ->
             series(image.imageName) {
-                relativateMapContent(cumulateMapContent(image.map), image.amountOfFiles).forEach { data(convertToCategory(it.key), it.value) }
+                relativateMapContent(cumulateMapContent(image.data), image.amountOfFiles).forEach { data(convertToCategory(it.key), it.value) }
             }
         }
     }
 
     private val barChart = barchart("Häufigkeit nach Dateigröße",
             createCategoryAxis(), createNumberAxis()) {
-        Data.images.forEach { image ->
+        DataCollection.images.forEach { image ->
             series(image.imageName) {
-                image.map.forEach { data(convertToCategory(it.key), it.value) }
+                image.data.forEach { data(convertToCategory(it.key), it.value) }
             }
         }
     }
 
-    private val pieChart = piechart("Häufigkeit nach Dateigröße von Abbild ${Data.images.getOrNull(0)?.imageName}") {
-        Data.images.getOrNull(0)?.map?.forEach { data(convertToCategory(it.key), it.value.toDouble()) }
+    private val pieChart = piechart("Häufigkeit nach Dateigröße von Abbild ${DataCollection.images.getOrNull(0)?.imageName}") {
+        DataCollection.images.getOrNull(0)?.data?.forEach { data(convertToCategory(it.key), it.value.toDouble()) }
     }
 
 
