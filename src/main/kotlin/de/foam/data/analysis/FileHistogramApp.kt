@@ -1,5 +1,9 @@
 package de.foam.data.analysis
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.module.kotlin.KotlinModule
+import com.fasterxml.jackson.module.kotlin.readValue
 import javafx.scene.chart.CategoryAxis
 import javafx.scene.chart.NumberAxis
 import javafx.scene.text.Font
@@ -7,6 +11,7 @@ import javafx.util.StringConverter
 import tornadofx.*
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.text.NumberFormat
 import java.util.*
 
@@ -26,28 +31,60 @@ import java.util.*
  * Otherwise the IntelliJ Idea doesn't recognise the newly add jfxrt.jar!
  */
 
+//File path for temporary save create data in JSON format!
+const val JSON_FILE_CACHE = "/home/johannes/Desktop/test/imageData.json"
+
 fun main(args: Array<String>) {
-
     launch<MasterApp>(args)
-
 }
 
 class Data {
     companion object {
-        val images = listOf<Image>(
-                //FIXME Define Images as Data Input
-                // Image("Test Image ",getFileSize(Paths.get("/home/user/test")))
-        )
+        val images: List<Image>
+
+        init {
+            //If data was previously created it will be loaded from serialized json file.
+            //Otherwise create the new data! This implementation shall improve performance when executing multiple times
+            val jsonDataCacheFile = Paths.get(JSON_FILE_CACHE)
+            if (jsonDataCacheFile.toFile().exists()) {
+                images = deserializeFromJSONFile(jsonDataCacheFile)
+            } else {
+                images = createData()
+                serializeToJSON(jsonDataCacheFile)
+            }
+        }
+
+        private fun createData(): List<Image> =
+                listOf<Image>(
+                        //FIXME Define Images as Data Input
+                        Image("Test Image ", getFileSize(Paths.get("/home/johannes/Desktop/installation")))
+                )
+
+        //val images = Data().deserializeFromJSONFile(Paths.get("/home/johannes/Desktop/test/test.json"))
+        private fun serializeToJSON(output: Path) {
+            val mapper = ObjectMapper().registerModule(KotlinModule())
+            //pretty file output
+            mapper.enable(SerializationFeature.INDENT_OUTPUT)
+            mapper.writeValue(output.toFile(), images)
+        }
+
+        private fun deserializeFromJSONFile(jsonInput: Path): List<Image> {
+            val mapper = ObjectMapper().registerModule(KotlinModule())
+            return mapper.readValue<List<Image>>(jsonInput.toFile())
+        }
     }
 }
 
-data class Image(val imageName: String, val map: Map<Int, Int>)
+data class Image(val imageName: String, val map: Map<Int, Int>) {
+    val amountOfFiles = map.values.sum()
+}
 
 class MasterApp : App(MasterView::class)
 
 class MasterView : View() {
 
-    private val lineChart = linechart("Häufigkeit nach Dateigröße", CategoryAxis(), NumberAxis()) {
+    private val lineChart = linechart("Häufigkeit nach Dateigröße",
+            createCategoryAxis(), createNumberAxis()) {
         Data.images.forEach { image ->
             series(image.imageName) {
                 image.map.forEach { data(convertToCategory(it.key), it.value) }
@@ -55,22 +92,8 @@ class MasterView : View() {
         }
     }
 
-    private val lineChartcategoryAxis = CategoryAxis().let {
-        it.label = "Dateigröße (in Byte)"
-        it.tickLabelFontProperty().set(Font.font(13.0))
-        it
-    }
-    private val lineChartnumberAxis = NumberAxis().let {
-        it.label = "Anzahl der Dateien"
-        it.tickLabelFormatterProperty().set(object : StringConverter<Number>() {
-            override fun fromString(p0: String?): Number = p0?.toInt() ?: 0
-            override fun toString(n: Number?): String = NumberFormat.getInstance(Locale.GERMANY).format(n)
-        })
-        it.tickLabelFontProperty().set(Font.font(13.0))
-        it
-    }
-
-    private val cumulatedLineChart = linechart("Kumulierte Häufigkeit nach Dateigröße", lineChartcategoryAxis, lineChartnumberAxis) {
+    private val cumulatedLineChart = linechart("Kumulierte Häufigkeit nach Dateigröße",
+            createCategoryAxis(), createNumberAxis()) {
         Data.images.forEach { image ->
             series(image.imageName) {
                 cumulateMapContent(image.map).forEach { data(convertToCategory(it.key), it.value) }
@@ -78,27 +101,17 @@ class MasterView : View() {
         }
     }
 
-    private val pieChart = piechart("Häufigkeit nach Dateigröße") {
-        Data.images.getOrNull(0)?.map?.forEach { data(convertToCategory(it.key), it.value.toDouble()) }
+    private val relativeCumulatedLineChart = linechart("Relativierte kumulierte Häufigkeit nach Dateigröße",
+            createCategoryAxis(), createNumberAxis("Anzahl der Dateien / Gesamtanzahl in %")) {
+        Data.images.forEach { image ->
+            series(image.imageName) {
+                relativateMapContent(cumulateMapContent(image.map), image.amountOfFiles).forEach { data(convertToCategory(it.key), it.value) }
+            }
+        }
     }
 
-    private val barChartCategoryAxis = CategoryAxis().let {
-        it.label = "Dateigröße (in Byte)"
-        it.tickLabelFontProperty().set(Font.font(13.0))
-        it
-    }
-    private val barChartNumberAxis = NumberAxis().let {
-        it.label = "Anzahl der Dateien"
-        it.tickLabelFormatterProperty().set(object : StringConverter<Number>() {
-            override fun fromString(p0: String?): Number = p0?.toInt() ?: 0
-            override fun toString(n: Number?): String = NumberFormat.getInstance(Locale.GERMANY).format(n)
-        })
-        it.tickLabelFontProperty().set(Font.font(13.0))
-        it
-    }
-
-
-    private val barChart = barchart("Häufigkeit nach Dateigröße", barChartCategoryAxis, barChartNumberAxis) {
+    private val barChart = barchart("Häufigkeit nach Dateigröße",
+            createCategoryAxis(), createNumberAxis()) {
         Data.images.forEach { image ->
             series(image.imageName) {
                 image.map.forEach { data(convertToCategory(it.key), it.value) }
@@ -106,12 +119,38 @@ class MasterView : View() {
         }
     }
 
+    private val pieChart = piechart("Häufigkeit nach Dateigröße von Abbild ${Data.images.getOrNull(0)?.imageName}") {
+        Data.images.getOrNull(0)?.map?.forEach { data(convertToCategory(it.key), it.value.toDouble()) }
+    }
+
+
     override val root = tabpane {
         title = "File Size Analysis"
         tab("Line Chart", lineChart)
         tab("Cumulative Line Chart", cumulatedLineChart)
+        tab("Relative Cumulative Line Chart", relativeCumulatedLineChart)
         tab("Bar Chart", barChart)
         tab("Pie Chart", pieChart)
+    }
+
+    private fun createCategoryAxis(): CategoryAxis {
+        return CategoryAxis().let {
+            it.label = "Dateigröße (in Byte)"
+            it.tickLabelFontProperty().set(Font.font(13.0))
+            it
+        }
+    }
+
+    private fun createNumberAxis(label: String = "Anzahl der Dateien"): NumberAxis {
+        return NumberAxis().let {
+            it.label = label
+            it.tickLabelFormatterProperty().set(object : StringConverter<Number>() {
+                override fun fromString(p0: String?): Number = p0?.toInt() ?: 0
+                override fun toString(n: Number?): String = NumberFormat.getInstance(Locale.GERMANY).format(n)
+            })
+            it.tickLabelFontProperty().set(Font.font(13.0))
+            it
+        }
     }
 }
 
@@ -153,6 +192,14 @@ fun cumulateMapContent(input: Map<Int, Int>): Map<Int, Int> {
             sum += input[i] ?: 0
         }
         output[it.key] = sum
+    }
+    return output
+}
+
+fun relativateMapContent(input: Map<Int, Int>, amountOfFiles: Int): Map<Int, Double> {
+    val output = HashMap<Int, Double>()
+    input.forEach {
+        output[it.key] = it.value.toDouble() / amountOfFiles * 100
     }
     return output
 }

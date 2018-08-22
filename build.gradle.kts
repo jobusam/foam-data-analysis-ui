@@ -18,6 +18,9 @@ dependencies {
 
     compile ("no.tornado","tornadofx","1.7.17")
 
+    //For serialization to JSON
+    compile ("com.fasterxml.jackson.module","jackson-module-kotlin","2.9.+")
+
     testCompile("junit", "junit", "4.12")
 }
 
