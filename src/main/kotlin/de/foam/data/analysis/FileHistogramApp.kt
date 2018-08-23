@@ -14,15 +14,18 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.text.NumberFormat
 import java.util.*
+import kotlin.math.roundToInt
 
 /**
  * @author jobusam
  *
  * This implementation creates several charts (bar chart, line chart, pie chart) and uses
- * as data input the file size of all files from a given directory (define data directories in DataCollection class!
+ * as data input the file size of all files from a given directory (define data directories in DataCollection class (see TODO)!
  *
  * The charts shall display the amount of files depending on the file size.
- *
+ * Additionally the extracted data from the input directories will be stored as JSON File
+ * to reuse it for the next application class. Delete this JSON Data Cache and the data
+ * will be extracted from the given input directories!
  *
  * For java fx support with openjdk under fedora:
  * install sudo dnf install openjfx openjfx-devel java-1.8.0-openjdk-openjfx java-1.8.0-openjdk-openjfx-devel
@@ -32,7 +35,7 @@ import java.util.*
  */
 
 //File path for temporary save create data in JSON format!
-const val JSON_FILE_CACHE = "/home/johannes/Desktop/test/imageData.json"
+const val JSON_FILE_CACHE = "imageDataSample.json"
 
 fun main(args: Array<String>) {
     launch<MasterApp>(args)
@@ -56,8 +59,8 @@ class DataCollection {
 
         private fun createData(): List<Image> =
                 listOf<Image>(
-                        //FIXME Define Images as Data Input
-                        Image("Test Image ", getFileSize(Paths.get("/home/johannes/Desktop/installation")))
+                        //TODO Define Images as Data Input
+                        Image("Test Image", getFileSize(Paths.get("./")))
                 )
 
         //val images = DataCollection().deserializeFromJSONFile(Paths.get("/home/johannes/Desktop/test/test.json"))
@@ -75,10 +78,11 @@ class DataCollection {
     }
 }
 
-data class CatStat(val amount:Int,val size:Long)
+data class Stat(val amount: Double, val size: Double)
 
-data class Image(val imageName: String, val data: Map<Int, Int>) {
-    val amountOfFiles = data.values.sum()
+data class Image(val imageName: String, val data: Map<Int, Stat>) {
+    val amountOfFiles = data.values.map { it.amount }.sum()
+    val imageSize = data.values.map { it.size }.sum()
 }
 
 class MasterApp : App(MasterView::class)
@@ -88,26 +92,45 @@ class MasterView : View() {
     private val lineChart = linechart("Häufigkeit nach Dateigröße",
             createCategoryAxis(), createNumberAxis()) {
         DataCollection.images.forEach { image ->
-            series(image.imageName) {
-                image.data.forEach { data(convertToCategory(it.key), it.value) }
+            series(createDisplayName(image)) {
+                image.data.forEach { data(convertToCategory(it.key), it.value.amount) }
             }
         }
     }
 
-    private val cumulatedLineChart = linechart("Kumulierte Häufigkeit nach Dateigröße",
+    private val cumulatedLineChartAmount = linechart("Kumulierte Häufigkeit nach Dateigröße",
             createCategoryAxis(), createNumberAxis()) {
         DataCollection.images.forEach { image ->
-            series(image.imageName) {
-                cumulateMapContent(image.data).forEach { data(convertToCategory(it.key), it.value) }
+            series(createDisplayName(image)) {
+                cumulateMapContent(image.data.mapValues { it.value.amount }).forEach { data(convertToCategory(it.key), it.value) }
             }
         }
     }
 
-    private val relativeCumulatedLineChart = linechart("Relativierte kumulierte Häufigkeit nach Dateigröße",
-            createCategoryAxis(), createNumberAxis("Anzahl der Dateien / Gesamtanzahl in %")) {
+    private val relativeCumulatedLineChartAmount = linechart("Relativierte kumulierte Häufigkeit nach Dateigröße",
+            createCategoryAxis(), createNumberAxis("Anzahl der Dateien / Gesamtanzahl (in %)")) {
         DataCollection.images.forEach { image ->
-            series(image.imageName) {
-                relativateMapContent(cumulateMapContent(image.data), image.amountOfFiles).forEach { data(convertToCategory(it.key), it.value) }
+            series(createDisplayName(image)) {
+                relativateMapContent(cumulateMapContent(image.data.mapValues { it.value.amount }), image.amountOfFiles)
+                        .forEach { data(convertToCategory(it.key), it.value) }
+            }
+        }
+    }
+
+    private val cumulatedLineChartSize = linechart("Kumulierte Größe nach Dateigröße",
+            createCategoryAxis(), createNumberAxisFileSizeinByte("Kategoriegröße in GB")) {
+        DataCollection.images.forEach { image ->
+            series(createDisplayName(image)) {
+                cumulateMapContent(image.data.mapValues { it.value.size }).forEach { data(convertToCategory(it.key), it.value) }
+            }
+        }
+    }
+
+    private val relativeCumulatedLineChartSize = linechart("Relativierte kumulierte Größe nach Dateigröße",
+            createCategoryAxis(), createNumberAxis("Dateigröße der Kategorie / Gesamtgröße (in %)")) {
+        DataCollection.images.forEach { image ->
+            series(createDisplayName(image)) {
+                relativateMapContent(cumulateMapContent(image.data.mapValues { it.value.size }), image.imageSize).forEach { data(convertToCategory(it.key), it.value) }
             }
         }
     }
@@ -115,44 +138,70 @@ class MasterView : View() {
     private val barChart = barchart("Häufigkeit nach Dateigröße",
             createCategoryAxis(), createNumberAxis()) {
         DataCollection.images.forEach { image ->
-            series(image.imageName) {
-                image.data.forEach { data(convertToCategory(it.key), it.value) }
+            series(createDisplayName(image)) {
+                image.data.forEach { data(convertToCategory(it.key), it.value.amount) }
             }
         }
     }
 
     private val pieChart = piechart("Häufigkeit nach Dateigröße von Abbild ${DataCollection.images.getOrNull(0)?.imageName}") {
-        DataCollection.images.getOrNull(0)?.data?.forEach { data(convertToCategory(it.key), it.value.toDouble()) }
+        DataCollection.images.getOrNull(0)?.data?.forEach { data(convertToCategory(it.key), it.value.amount) }
     }
 
 
     override val root = tabpane {
         title = "File Size Analysis"
-        tab("Line Chart", lineChart)
-        tab("Cumulative Line Chart", cumulatedLineChart)
-        tab("Relative Cumulative Line Chart", relativeCumulatedLineChart)
-        tab("Bar Chart", barChart)
-        tab("Pie Chart", pieChart)
+        tab("Line Chart - Amount", lineChart)
+        tab("Cumulative Line Chart - Amount", cumulatedLineChartAmount)
+        tab("Relative Cumulative Line Chart - Amount", relativeCumulatedLineChartAmount)
+        tab("Bar Chart - Amount", barChart)
+        tab("Pie Chart -Amount", pieChart)
+        tab("Cumulative Line Chart - Size", cumulatedLineChartSize)
+        tab("Relative Cumulative Line Chart - Size", relativeCumulatedLineChartSize)
+
     }
 
     private fun createCategoryAxis(): CategoryAxis {
-        return CategoryAxis().let {
-            it.label = "Dateigröße (in Byte)"
-            it.tickLabelFontProperty().set(Font.font(13.0))
-            it
-        }
+        val categoryAxis = CategoryAxis()
+        categoryAxis.label = "Dateigröße (in Byte)"
+        categoryAxis.tickLabelFontProperty().set(Font.font(13.0))
+        return categoryAxis
     }
 
     private fun createNumberAxis(label: String = "Anzahl der Dateien"): NumberAxis {
-        return NumberAxis().let {
-            it.label = label
-            it.tickLabelFormatterProperty().set(object : StringConverter<Number>() {
-                override fun fromString(p0: String?): Number = p0?.toInt() ?: 0
-                override fun toString(n: Number?): String = NumberFormat.getInstance(Locale.GERMANY).format(n)
-            })
-            it.tickLabelFontProperty().set(Font.font(13.0))
-            it
-        }
+        val numberAxis = NumberAxis()
+        numberAxis.label = label
+        numberAxis.tickLabelFormatterProperty().set(object : StringConverter<Number>() {
+            override fun fromString(p0: String?): Number = p0?.toInt() ?: 0
+            override fun toString(n: Number?): String = NumberFormat.getInstance(Locale.GERMANY).format(n)
+        })
+        numberAxis.tickLabelFontProperty().set(Font.font(13.0))
+        return numberAxis
+    }
+
+    //TODO following configuration contains special hard coded data range and units! Update if necessary.
+    private fun createNumberAxisFileSizeinByte(label: String ): NumberAxis {
+        // CAUTION: This axis will be hardcoded with tick unit of 50 GB!
+        val numberAxis = NumberAxis(label,0.0,250.0 * 1024 * 1024 * 1024,25.0 * 1024 * 1024 * 1024)
+        numberAxis.tickLabelFormatterProperty().set(object : StringConverter<Number>() {
+            override fun fromString(p0: String?): Number = p0?.toInt() ?: 0
+            override fun toString(n: Number?): String {
+                //FIXME This is quick and dirty hack to display the fileSize directly in GB
+                val displayValue = (n?.toDouble() ?: 1.0) / (1024 * 1024 * 1024)
+                return "${NumberFormat.getInstance(Locale.GERMANY).format(displayValue)} GB"
+            }
+        })
+        numberAxis.tickLabelFontProperty().set(Font.font(13.0))
+        return numberAxis
+    }
+
+
+    /**
+     * create Image Name and add file size in GB to the name!
+     */
+    private fun createDisplayName(image: Image): String {
+        val sizeInGb = image.imageSize / (1024 * 1024 * 1024)
+        return "${image.imageName} (~ ${sizeInGb.roundToInt()} GB)"
     }
 }
 
@@ -164,44 +213,46 @@ fun convertToCategory(value: Int): String {
     return map[value] ?: "???"
 }
 
-fun getFileSize(directory: Path): Map<Int, Int> {
+fun getFileSize(directory: Path): Map<Int, Stat> {
 
-    val map = HashMap<Int, Int>()
+    val output = HashMap<Int, Stat>()
 
     Files.walk(directory)
             //.parallel() //Keep in mind this can cause other problems.
             // see also https://dzone.com/articles/think-twice-using-java-8
             .filter { it.toFile().isFile }
             .map { Files.size(it) }
-            //.peek{System.out.println("Input = $it")}
-            .map { Math.max(1, it) }
-            .map { Math.log10(it.toDouble()) }
-            //.peek{System.out.println(it)}
-            //.map { String.format("%.2g%n",it).toDouble()}
-            .map { it.toInt() }
+            .map { Stat(it.toDouble(), it.toDouble()) }
+            .map { Stat(Math.max(1.0, it.amount), it.size) }
+            .map { Stat(Math.log10(it.amount), it.size) }
+            // following map is import to trim double values to integer
+            .map { Stat(it.amount.toInt().toDouble(), it.size) }
             //.peek{System.out.println(it)}
             .forEach {
-                map[it] = (map[it] ?: 0) + 1
+                val key = it.amount.toInt()
+                val amount = (output[key]?.amount ?: 0.0) + 1.0
+                val size = (output[key]?.size ?: 0.0) + it.size
+                output[key] = Stat(amount, size)
             }
-    return map
+    return output
 }
 
-fun cumulateMapContent(input: Map<Int, Int>): Map<Int, Int> {
-    val output = HashMap<Int, Int>()
+fun cumulateMapContent(input: Map<Int, Double>): Map<Int, Double> {
+    val output = HashMap<Int, Double>()
     input.forEach {
-        var sum = 0
+        var sum = 0.0
         for (i in 0..it.key) {
-            sum += input[i] ?: 0
+            sum += input[i] ?: 0.0
         }
         output[it.key] = sum
     }
     return output
 }
 
-fun relativateMapContent(input: Map<Int, Int>, amountOfFiles: Int): Map<Int, Double> {
+fun relativateMapContent(input: Map<Int, Double>, amountOfFiles: Double): Map<Int, Double> {
     val output = HashMap<Int, Double>()
     input.forEach {
-        output[it.key] = it.value.toDouble() / amountOfFiles * 100
+        output[it.key] = it.value / amountOfFiles * 100
     }
     return output
 }
