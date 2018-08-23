@@ -117,7 +117,7 @@ class MasterView : View() {
         }
     }
 
-    private val cumulatedLineChartSize = linechart("Kumulierte Größe nach Dateigröße",
+    private val cumulatedLineChartSize = linechart("Kumulierte Kategoriegröße nach Dateigröße",
             createCategoryAxis(), createNumberAxisFileSizeinByte("Kategoriegröße in GB")) {
         DataCollection.images.forEach { image ->
             series(createDisplayName(image)) {
@@ -126,7 +126,7 @@ class MasterView : View() {
         }
     }
 
-    private val relativeCumulatedLineChartSize = linechart("Relativierte kumulierte Größe nach Dateigröße",
+    private val relativeCumulatedLineChartSize = linechart("Relativierte kumulierte Kategoriegröße nach Dateigröße",
             createCategoryAxis(), createNumberAxis("Dateigröße der Kategorie / Gesamtgröße (in %)")) {
         DataCollection.images.forEach { image ->
             series(createDisplayName(image)) {
@@ -163,7 +163,7 @@ class MasterView : View() {
 
     private fun createCategoryAxis(): CategoryAxis {
         val categoryAxis = CategoryAxis()
-        categoryAxis.label = "Dateigröße (in Byte)"
+        categoryAxis.label = "Dateikategorie aufgeteilt nach Dateigröße (in Bytes)"
         categoryAxis.tickLabelFontProperty().set(Font.font(13.0))
         return categoryAxis
     }
