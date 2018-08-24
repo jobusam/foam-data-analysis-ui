@@ -179,15 +179,14 @@ class MasterView : View() {
         return numberAxis
     }
 
-    //TODO following configuration contains special hard coded data range and units! Update if necessary.
     private fun createNumberAxisFileSizeinByte(label: String ): NumberAxis {
-        // CAUTION: This axis will be hardcoded with tick unit of 50 GB!
-        val numberAxis = NumberAxis(label,0.0,250.0 * 1024 * 1024 * 1024,25.0 * 1024 * 1024 * 1024)
+        val numberAxis = NumberAxis()
+        numberAxis.label = label
         numberAxis.tickLabelFormatterProperty().set(object : StringConverter<Number>() {
             override fun fromString(p0: String?): Number = p0?.toInt() ?: 0
             override fun toString(n: Number?): String {
                 //FIXME This is quick and dirty hack to display the fileSize directly in GB
-                val displayValue = (n?.toDouble() ?: 1.0) / (1024 * 1024 * 1024)
+                val displayValue = (n?.toDouble() ?: 1.0) / (1000 * 1000 * 1000)
                 return "${NumberFormat.getInstance(Locale.GERMANY).format(displayValue)} GB"
             }
         })
@@ -197,10 +196,10 @@ class MasterView : View() {
 
 
     /**
-     * create Image Name and add file size in GB to the name!
+     * create Image Name and add file size in GB (but use 1000 factor and not 1024 to the name
      */
     private fun createDisplayName(image: Image): String {
-        val sizeInGb = image.imageSize / (1024 * 1024 * 1024)
+        val sizeInGb = image.imageSize / (1000 * 1000 * 1000)
         return "${image.imageName} (~ ${sizeInGb.roundToInt()} GB)"
     }
 }
