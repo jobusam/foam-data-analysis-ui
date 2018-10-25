@@ -95,7 +95,7 @@
   "amountOfFiles" : 163555.0,
   "imageSize" : 5.4647422133E10
 }, {
-  "imageName" : "Windows System",
+  "imageName" : "Windows System #1",
   "data" : {
     "0" : {
       "amount" : 3595.0,
@@ -141,6 +141,56 @@
   "amountOfFiles" : 624650.0,
   "imageSize" : 2.22409438812E11
 }, {
+  "imageName" : "Windows System #2",
+  "data" : {
+    "0" : {
+      "amount" : 856.0,
+      "size" : 1341.0
+    },
+    "1" : {
+      "amount" : 5114.0,
+      "size" : 254594.0
+    },
+    "2" : {
+      "amount" : 114089.0,
+      "size" : 6.0600235E7
+    },
+    "3" : {
+      "amount" : 274046.0,
+      "size" : 1.05220028E9
+    },
+    "4" : {
+      "amount" : 148506.0,
+      "size" : 4.27736709E9
+    },
+    "5" : {
+      "amount" : 45881.0,
+      "size" : 1.2955047932E10
+    },
+    "6" : {
+      "amount" : 10261.0,
+      "size" : 2.3886948186E10
+    },
+    "7" : {
+      "amount" : 465.0,
+      "size" : 1.054351476E10
+    },
+    "8" : {
+      "amount" : 47.0,
+      "size" : 1.4641641242E10
+    },
+    "9" : {
+      "amount" : 19.0,
+      "size" : 6.6003833843E10
+    },
+    "10" : {
+      "amount" : 4.0,
+      "size" : 4.2973812424E10
+    }
+  },
+  "amountOfFiles" : 599288.0,
+  "imageSize" : 1.76395221927E11
+} ,{
   "imageName" : "NAS Datenspeicher",
   "data" : {
     "0" : {
